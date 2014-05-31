@@ -135,7 +135,7 @@ static const int kStateKey;
     [self TPKeyboardAvoiding_findTextFieldAfterTextField:firstResponder beneathView:self minY:&minY foundView:&view];
     
     if ( view ) {
-        [view performSelector:@selector(becomeFirstResponder) withObject:nil afterDelay:0.0];
+        [view becomeFirstResponder];
         return YES;
     }
     
@@ -176,7 +176,7 @@ static const int kStateKey;
     CGFloat priorFieldOffset = CGRectGetMinY([self convertRect:priorTextField.frame fromView:priorTextField.superview]);
     for ( UIView *childView in view.subviews ) {
         if ( childView.hidden ) continue;
-        if ( ([childView isKindOfClass:[UITextField class]] || [childView isKindOfClass:[UITextView class]]) && childView.isUserInteractionEnabled) {
+        if ( ([childView isKindOfClass:[UITextField class]] || [childView isKindOfClass:[UITextView class]]) ) {
             CGRect frame = [self convertRect:childView.frame fromView:view];
             if ( childView != priorTextField
                     && CGRectGetMinY(frame) >= priorFieldOffset
@@ -224,6 +224,9 @@ static const int kStateKey;
 
 
 - (UIEdgeInsets)TPKeyboardAvoiding_contentInsetForKeyboard {
+    if ([self TPKeyboardAvoiding_isInPopover])
+        return self.contentInset;
+    
     TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
     UIEdgeInsets newInset = self.contentInset;
     CGRect keyboardRect = state.keyboardRect;
@@ -264,18 +267,34 @@ static const int kStateKey;
 }
 
 - (void)TPKeyboardAvoiding_initializeView:(UIView*)view {
-    if ( [view isKindOfClass:[UITextField class]] && ((UITextField*)view).returnKeyType == UIReturnKeyDefault && (![(id)view delegate] || [(id)view delegate] == self) ) {
+    if ( ([view isKindOfClass:[UITextField class]] || [view isKindOfClass:[UITextView class]]) && (![(id)view delegate] || [(id)view delegate] == self) ) {
         [(id)view setDelegate:self];
-        UIView *otherView = nil;
-        CGFloat minY = CGFLOAT_MAX;
-        [self TPKeyboardAvoiding_findTextFieldAfterTextField:view beneathView:self minY:&minY foundView:&otherView];
         
-        if ( otherView ) {
-            ((UITextField*)view).returnKeyType = UIReturnKeyNext;
-        } else {
-            ((UITextField*)view).returnKeyType = UIReturnKeyDone;
+        if ( [view isKindOfClass:[UITextField class]] && ((UITextField*)view).returnKeyType == UIReturnKeyDefault ) {
+            UIView *otherView = nil;
+            CGFloat minY = CGFLOAT_MAX;
+            [self TPKeyboardAvoiding_findTextFieldAfterTextField:view beneathView:self minY:&minY foundView:&otherView];
+            
+            if ( otherView ) {
+                ((UITextField*)view).returnKeyType = UIReturnKeyNext;
+            } else {
+                ((UITextField*)view).returnKeyType = UIReturnKeyDone;
+            }
         }
     }
+}
+
+- (BOOL)TPKeyboardAvoiding_isInPopover {
+    UIView *parent = self.superview;
+    while (parent) {
+        if ([NSStringFromClass(parent.class) rangeOfString:@"UIPopover"].location != NSNotFound) {
+            return YES;
+        }
+        
+        parent = parent.superview;
+    }
+    
+    return NO;
 }
 
 @end
